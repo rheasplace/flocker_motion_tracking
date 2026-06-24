@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Body Shape Field</title>
+<style>
+  :root{
+    --bg: #0b0d10;
+    --panel: #14171c;
+    --line: #2a2f37;
+    --ink: #e7e9ec;
+    --dim: #8d949e;
+    --accent: #5ee0c1;
+    --accent2: #ff6b6b;
+    --mono: 'IBM Plex Mono', 'SF Mono', Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--mono);
+    width: 100%; height: 100%;
+    overflow: hidden;
+  }
+  #app {
+    display: flex;
+    width: 100%;
+    height: 100vh;
+  }
+  #stage {
+    position: relative;
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #000;
+    min-width: 0;
+  }
+  #canvas-holder {
+    position: relative;
+    line-height: 0;
+    flex: 1 1 auto;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  #canvas-holder canvas {
+    display: block;
+    border-radius: 0;
+    width: 100%;
+    height: 100%;
+  }
+  #status {
+    position: absolute;
+    top: 14px; left: 14px;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    color: var(--dim);
+    background: rgba(11,13,16,0.7);
+    padding: 6px 10px;
+    border-radius: 4px;
+    border: 1px solid var(--line);
+    z-index: 5;
+    max-width: 70%;
+  }
+  #status .dot {
+    display: inline-block;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    margin-right: 6px;
+    background: var(--accent2);
+    position: relative; top: 1px;
+  }
+  #status.live .dot { background: var(--accent); }
+
+  #side {
+    width: 320px;
+    flex: 0 0 320px;
+    background: var(--panel);
+    border-left: 1px solid var(--line);
+    padding: 18px 18px 18px 18px;
+    overflow-y: auto;
+  }
+  #side h1 {
+    font-size: 14px;
+    margin: 0 0 2px 0;
+    letter-spacing: 0.04em;
+    color: var(--ink);
+  }
+  #side .sub {
+    font-size: 11px;
+    color: var(--dim);
+    margin-bottom: 18px;
+  }
+  .section {
+    margin-bottom: 20px;
+    border-top: 1px solid var(--line);
+    padding-top: 14px;
+  }
+  .section:first-of-type { border-top: none; padding-top: 0; }
+  .section h2 {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--accent);
+    margin: 0 0 10px 0;
+  }
+  .row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 10px;
+    font-size: 11.5px;
+  }
+  .row label {
+    color: var(--dim);
+    flex: 1 1 auto;
+  }
+  .row .val {
+    color: var(--ink);
+    width: 38px;
+    text-align: right;
+    flex: 0 0 auto;
+    font-size: 11px;
+  }
+  input[type="range"] {
+    width: 100%;
+    accent-color: var(--accent);
+  }
+  .checkrow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11.5px;
+    color: var(--dim);
+    margin-bottom: 8px;
+    cursor: pointer;
+    user-select: none;
+  }
+  .checkrow input { accent-color: var(--accent); }
+  button {
+    font-family: var(--mono);
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--ink);
+    font-size: 11px;
+    padding: 7px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    letter-spacing: 0.04em;
+  }
+  button:hover { border-color: var(--accent); color: var(--accent); }
+  button:active { transform: translateY(1px); }
+  .btnrow { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  .keypoint-list {
+    font-size: 10.5px;
+    color: var(--dim);
+    line-height: 1.7;
+    columns: 2;
+    column-gap: 14px;
+  }
+  .keypoint-list div { white-space: nowrap; }
+  .keypoint-list .idx { color: var(--accent); display: inline-block; width: 18px; }
+
+  details {
+    border-top: 1px solid var(--line);
+    padding-top: 14px;
+    margin-top: 6px;
+  }
+  details summary {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--accent);
+    cursor: pointer;
+    margin-bottom: 10px;
+  }
+  details p {
+    font-size: 11.5px;
+    color: var(--dim);
+    line-height: 1.6;
+    margin: 0 0 10px 0;
+  }
+  details p b { color: var(--ink); font-weight: 600; }
+  details code {
+    background: #0b0d10;
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 1px 5px;
+    color: var(--accent);
+    font-size: 10.5px;
+  }
+
+  #legend {
+    position: absolute;
+    bottom: 14px; left: 14px;
+    display: flex;
+    gap: 14px;
+    font-size: 10px;
+    color: var(--dim);
+    background: rgba(11,13,16,0.7);
+    padding: 6px 10px;
+    border-radius: 4px;
+    border: 1px solid var(--line);
+    z-index: 5;
+  }
+  #legend span { display: flex; align-items: center; gap: 5px; }
+  #legend .sw { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-thumb { background: var(--line); border-radius: 4px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="stage">
+    <div id="canvas-holder">
+      <div id="status"><span class="dot"></span><span id="status-text">requesting webcam…</span></div>
+      <div id="legend">
+        <span><i class="sw" style="background:#5ee0c1"></i>tracked keypoint</span>
+        <span><i class="sw" style="background:#ff6b6b"></i>skeleton link</span>
+        <span><i class="sw" style="background:#7aa2ff"></i>distortion region</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="side">
+    <h1>TRACKED / ERASED</h1>
+    <div class="sub">surveillance → pixelation → identity loss</div>
+
+    <div class="section">
+      <h2>Tracking</h2>
+      <div class="checkrow"><input type="checkbox" id="toggleVideo" checked> show camera feed</div>
+      <div class="checkrow"><input type="checkbox" id="toggleSkeleton" checked> show skeleton overlay</div>
+      <div class="checkrow"><input type="checkbox" id="togglePoints" checked> show keypoints</div>
+      <div class="row">
+        <label>detection confidence</label>
+        <input type="range" id="confSlider" min="0" max="0.9" step="0.05" value="0.3">
+        <span class="val" id="confVal">0.30</span>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Distortion</h2>
+      <div class="row">
+        <label>detection rate</label>
+        <input type="range" id="spawnSlider" min="0" max="1" step="0.02" value="0.35">
+        <span class="val" id="spawnVal">0.35</span>
+      </div>
+      <div class="row">
+        <label>scramble intensity</label>
+        <input type="range" id="intensitySlider" min="0" max="1" step="0.05" value="0.6">
+        <span class="val" id="intensityVal">0.60</span>
+      </div>
+      <div class="row">
+        <label>max distortions</label>
+        <input type="range" id="maxSlider" min="5" max="200" step="5" value="80">
+        <span class="val" id="maxVal">80</span>
+      </div>
+      <div class="row">
+        <label>region size</label>
+        <input type="range" id="vertSlider" min="3" max="5" step="1" value="3">
+        <span class="val" id="vertVal">3</span>
+      </div>
+      <div class="btnrow">
+        <button id="clearBtn">reset image</button>
+        <button id="pauseBtn">pause tracking</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Face zoom box</h2>
+      <div class="checkrow"><input type="checkbox" id="toggleFaceBox" checked> show face box</div>
+      <div class="row">
+        <label>box size</label>
+        <input type="range" id="faceBoxSlider" min="80" max="300" step="10" value="150">
+        <span class="val" id="faceBoxVal">150</span>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Data streams</h2>
+      <div class="checkrow"><input type="checkbox" id="toggleDataStreams" checked> show data flow</div>
+      <div class="row">
+        <label>stream emission</label>
+        <input type="range" id="dataRateSlider" min="0" max="1" step="0.05" value="0.3">
+        <span class="val" id="dataRateVal">0.30</span>
+      </div>
+      <div class="row">
+        <label>stream speed</label>
+        <input type="range" id="dataSpeedSlider" min="0.5" max="4" step="0.25" value="1.5">
+        <span class="val" id="dataSpeedVal">1.50</span>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>17 tracked keypoints</h2>
+      <div class="keypoint-list" id="kpList"></div>
+    </div>
+
+    <details>
+      <summary>How this works</summary>
+      <p><b>The concept:</b> A body-tracking camera system designed for security and identification is repurposed as an instrument of erasure. The more you move, the more you're tracked, the more your image is destroyed. Each detection becomes a site of distortion.</p>
+      <p><b>1. Capture.</b> The browser's <code>getUserMedia</code> grabs your webcam into an HTML <code>&lt;video&gt;</code> element, which p5.js draws to a canvas each frame.</p>
+      <p><b>2. Pose estimation.</b> Every frame is passed to <b>ml5.js's bodyPose</b>, a wrapper around Google's <b>MoveNet</b> model (TensorFlow.js). MoveNet runs locally on your device — no video leaves your machine. It outputs 17 keypoint coordinates: the full skeleton.</p>
+      <p><b>3. Detection spawning.</b> Each frame, with probability = <i>detection rate</i>, the system picks N random currently-visible keypoints and defines a region (polygon) between them. This is the "detection" moment — your body has been tracked.</p>
+      <p><b>4. Pixelation.</b> Instead of drawing a shape, the system extracts the video pixels in that region and pixelates them — scrambling your image in the exact location the camera identified you. Higher <i>scramble intensity</i> = larger pixel blocks = more complete erasure.</p>
+      <p><b>5. Accumulation.</b> Each new detection adds another layer of pixelation on top. As you move and generate more detections, your image progressively dissolves, replaced by the mosaic of countless "tracking events." The system meant to identify you becomes the means of your visual destruction.</p>
+      <p><b>Tuning:</b> Low detection rate + high intensity = sparse, dramatic censorship marks. High rate + low intensity = dense, granular distortion covering your whole body. Region size (3 vs 5 points) changes the shape of the distortion zones — tight triangles vs loose, organic shapes.</p>
+    </details>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/ml5@1/dist/ml5.min.js"></script>
+<script>
+// ---------------------------------------------------------------
+// KEYPOINT REFERENCE (MoveNet / ml5 bodyPose output order)
+// ---------------------------------------------------------------
+const KEYPOINT_NAMES = [
+  "nose", "left_eye", "right_eye", "left_ear", "right_ear",
+  "left_shoulder", "right_shoulder", "left_elbow", "right_elbow",
+  "left_wrist", "right_wrist", "left_hip", "right_hip",
+  "left_knee", "right_knee", "left_ankle", "right_ankle"
+];
+
+// Pairs of keypoint names to draw as skeleton reference lines
+const SKELETON_EDGES = [
+  ["left_shoulder","right_shoulder"],
+  ["left_shoulder","left_elbow"], ["left_elbow","left_wrist"],
+  ["right_shoulder","right_elbow"], ["right_elbow","right_wrist"],
+  ["left_shoulder","left_hip"], ["right_shoulder","right_hip"],
+  ["left_hip","right_hip"],
+  ["left_hip","left_knee"], ["left_knee","left_ankle"],
+  ["right_hip","right_knee"], ["right_knee","right_ankle"],
+  ["nose","left_eye"], ["nose","right_eye"],
+  ["left_eye","left_ear"], ["right_eye","right_ear"]
+];
+
+let videoW = window.innerWidth - 320, videoH = window.innerHeight;
+
+let video;
+let bodyPose;
+let poses = [];
+let modelReady = false;
+
+let shapes = []; // collection of currently-active distortion regions
+let dataStreams = []; // binary digit particles flowing upward
+let spawnPaused = false;
+
+// UI state
+let showVideo = true, showSkeleton = true, showPoints = true, showFaceBox = true, showDataStreams = true;
+let minConfidence = 0.3, spawnRate = 0.35, distortIntensity = 0.6, maxShapes = 80, vertsPerShape = 3, faceBoxSize = 150, dataStreamRate = 0.3, dataStreamSpeed = 1.5;
+
+function preload() {
+  setStatus(false, "loading MoveNet weights from CDN…");
+}
+
+window.addEventListener("error", (e) => {
+  setStatus(false, "ERROR: " + e.message);
+});
+window.addEventListener("unhandledrejection", (e) => {
+  setStatus(false, "ERROR: " + (e.reason && e.reason.message ? e.reason.message : e.reason));
+});
+
+function setup() {
+  const cnv = createCanvas(videoW, videoH);
+  cnv.parent("canvas-holder");
+  buildKeypointList();
+  wireUI();
+
+  // Handle window resize to keep canvas fullscreen
+  window.addEventListener("resize", () => {
+    videoW = window.innerWidth - 320;
+    videoH = window.innerHeight;
+    resizeCanvas(videoW, videoH);
+  });
+
+  if (typeof ml5 === "undefined") {
+    setStatus(false, "ERROR: ml5.js script failed to load (check network/ad-blocker/VPN)");
+    return;
+  }
+
+  // Watchdog: if the model callback never fires, say so instead of hanging on "loading" forever
+  const modelTimeout = setTimeout(() => {
+    if (!modelReady) {
+      setStatus(false, "ERROR: model load timed out — open console (F12) for details");
+    }
+  }, 15000);
+
+  bodyPose = ml5.bodyPose("MoveNet", { flipped: false }, () => {
+    modelReady = true;
+    clearTimeout(modelTimeout);
+    startCamera();
+  });
+}
+
+function startCamera() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    setStatus(false, "ERROR: getUserMedia unavailable — needs https:// or localhost, not file://");
+    return;
+  }
+
+  setStatus(true, "model ready · requesting camera permission…");
+
+  video = createCapture(VIDEO, () => {
+    setStatus(true, "camera connected · detecting…");
+    bodyPose.detectStart(video, gotPoses);
+  });
+  video.size(videoW, videoH);
+  video.hide();
+
+  video.elt.addEventListener("error", (e) => {
+    setStatus(false, "ERROR: video element failed — " + e.message);
+  });
+}
+
+function gotPoses(results) {
+  poses = results;
+  
+  // Check if video is actually playing and has frames
+  const videoReady = video && video.elt && video.elt.readyState >= 2;
+  
+  if (modelReady) {
+    if (!videoReady) {
+      setStatus(false, "camera not ready — checking permission…");
+    } else {
+      setStatus(true, "tracking · " + (poses.length ? poses.length + " body detected" : "no body in frame"));
+    }
+  }
+}
+
+function draw() {
+  // Draw video directly to canvas context for reliability
+  if (showVideo && video && video.elt && video.elt.readyState >= 2) {
+    const ctx = drawingContext;
+    ctx.drawImage(video.elt, 0, 0, width, height);
+  } else {
+    background(0);
+  }
+
+  maybeSpawnShape();
+  updateAndDrawShapes();
+  drawFaceBox();
+  maybeSpawnDataStreams();
+  drawBinaryRain();
+  updateAndDrawDataStreams();
+
+  if (poses.length) {
+    drawSkeletonAndLabels(poses[0]);
+  }
+}
+
+// ---------------------------------------------------------------
+// SHAPE SYSTEM
+// ---------------------------------------------------------------
+function getVisibleKeypoints(pose) {
+  if (!pose) return [];
+  return pose.keypoints.filter(k => k.confidence >= minConfidence);
+}
+
+function maybeSpawnShape() {
+  if (spawnPaused || !poses.length) return;
+  if (shapes.length >= maxShapes) return;
+
+  const visible = getVisibleKeypoints(poses[0]);
+  if (visible.length < vertsPerShape) return;
+
+  if (random() < spawnRate) {
+    const pool = [...visible];
+    const picked = [];
+    for (let i = 0; i < vertsPerShape && pool.length; i++) {
+      const idx = floor(random(pool.length));
+      picked.push(pool.splice(idx, 1)[0]);
+    }
+    if (picked.length === vertsPerShape) {
+      shapes.push({
+        pts: picked.map(p => ({ x: p.x, y: p.y })),
+        age: 0,
+        intensity: distortIntensity
+      });
+    }
+  }
+}
+
+function updateAndDrawShapes() {
+  if (!shapes.length) return;
+
+  // Safety check: make sure we have valid pixel data before trying to distort
+  const ctx = drawingContext;
+  if (!ctx) return;
+
+  // Get raw canvas pixel data
+  let pixelData;
+  try {
+    pixelData = ctx.getImageData(0, 0, width, height);
+  } catch (e) {
+    // Canvas might not be ready yet
+    return;
+  }
+
+  const data = pixelData.data;
+
+  // Apply each distortion region
+  for (let i = shapes.length - 1; i >= 0; i--) {
+    const s = shapes[i];
+    s.age++;
+    
+    // fade out after 120 frames
+    const alpha = map(min(s.age, 120), 0, 120, 1, 0);
+    if (alpha <= 0) { shapes.splice(i, 1); continue; }
+
+    applyPixelDistortion(pixelData, s.pts, s.intensity * alpha);
+  }
+
+  // Write distorted pixels back to canvas
+  ctx.putImageData(pixelData, 0, 0);
+}
+
+function applyPixelDistortion(imgData, pts, intensity) {
+  const data = imgData.data;
+  const w = imgData.width;
+  const h = imgData.height;
+
+  // Get bounding box of the polygon
+  let minX = width, maxX = 0, minY = height, maxY = 0;
+  for (const p of pts) {
+    minX = min(minX, p.x);
+    maxX = max(maxX, p.x);
+    minY = min(minY, p.y);
+    maxY = max(maxY, p.y);
+  }
+  minX = max(0, floor(minX));
+  maxX = min(w - 1, ceil(maxX));
+  minY = max(0, floor(minY));
+  maxY = min(h - 1, ceil(maxY));
+
+  // Pixelate block size based on intensity
+  const blockSize = max(2, floor(lerp(1, 20, intensity)));
+
+  // Iterate through region and pixelate
+  for (let y = minY; y < maxY; y += blockSize) {
+    for (let x = minX; x < maxX; x += blockSize) {
+      // Check if pixel is inside polygon
+      if (!pointInPolygon(x, y, pts)) continue;
+
+      // Average this block
+      let r = 0, g = 0, b = 0, count = 0;
+      for (let dy = 0; dy < blockSize && y + dy < h; dy++) {
+        for (let dx = 0; dx < blockSize && x + dx < w; dx++) {
+          const idx = ((y + dy) * w + (x + dx)) * 4;
+          r += data[idx];
+          g += data[idx + 1];
+          b += data[idx + 2];
+          count++;
+        }
+      }
+      
+      // Write averaged color back across block
+      const avgR = floor(r / count);
+      const avgG = floor(g / count);
+      const avgB = floor(b / count);
+      
+      for (let dy = 0; dy < blockSize && y + dy < h; dy++) {
+        for (let dx = 0; dx < blockSize && x + dx < w; dx++) {
+          const idx = ((y + dy) * w + (x + dx)) * 4;
+          data[idx] = avgR;
+          data[idx + 1] = avgG;
+          data[idx + 2] = avgB;
+        }
+      }
+    }
+  }
+}
+
+// Point-in-polygon test (ray casting)
+function pointInPolygon(x, y, polygon) {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i].x, yi = polygon[i].y;
+    const xj = polygon[j].x, yj = polygon[j].y;
+    
+    const intersect = ((yi > y) !== (yj > y))
+      && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+// ---------------------------------------------------------------
+// FACE BOX ZOOM
+// ---------------------------------------------------------------
+function drawFaceBox() {
+  if (!showFaceBox || !poses.length) return;
+  const nose = poses[0].keypoints.find(k => k.name === "nose");
+  if (!nose || nose.confidence < minConfidence) return;
+
+  const ctx = drawingContext;
+  const extractSize = faceBoxSize / 2;
+  const sx = max(0, min(nose.x - extractSize, width - faceBoxSize));
+  const sy = max(0, min(nose.y - extractSize, height - faceBoxSize));
+
+  try {
+    const pixels = ctx.getImageData(sx, sy, faceBoxSize, faceBoxSize);
+    const tempCanvas = document.createElement("canvas");
+    tempCanvas.width = faceBoxSize;
+    tempCanvas.height = faceBoxSize;
+    tempCanvas.getContext("2d").putImageData(pixels, 0, 0);
+
+    ctx.strokeStyle = "rgba(255, 107, 107, 0.8)";
+    ctx.lineWidth = 2;
+    ctx.drawImage(tempCanvas, sx, sy);
+    ctx.strokeRect(sx, sy, faceBoxSize, faceBoxSize);
+  } catch (e) {}
+}
+
+// ---------------------------------------------------------------
+// DATA STREAMS (binary particles flowing upward)
+// ---------------------------------------------------------------
+function maybeSpawnDataStreams() {
+  if (!showDataStreams || !poses.length) return;
+  
+  const visible = getVisibleKeypoints(poses[0]);
+  
+  // Spawn streams from random visible keypoints
+  for (const kp of visible) {
+    if (random() < dataStreamRate * 0.1) { // reduced rate since we're spawning per keypoint
+      for (let i = 0; i < floor(dataStreamRate * 2); i++) {
+        dataStreams.push({
+          x: kp.x + random(-20, 20),
+          y: kp.y + random(-20, 20),
+          char: random() > 0.5 ? "1" : "0",
+          vx: random(-0.3, 0.3),
+          vy: -dataStreamSpeed,
+          life: 255,
+          hue: random(100, 180) // cyan to blue range
+        });
+      }
+    }
+  }
+}
+
+function updateAndDrawDataStreams() {
+  if (!showDataStreams || !dataStreams.length) return;
+
+  push();
+  fill(94, 224, 193); // cyan color
+  textSize(10);
+  textAlign(CENTER, CENTER);
+  
+  for (let i = dataStreams.length - 1; i >= 0; i--) {
+    const d = dataStreams[i];
+    d.x += d.vx;
+    d.y += d.vy;
+    d.life -= 3;
+    
+    if (d.life <= 0) {
+      dataStreams.splice(i, 1);
+      continue;
+    }
+    
+    // Fade as it goes up
+    const alpha = map(d.life, 255, 0, 200, 0);
+    fill(94, 224, 193, alpha);
+    text(d.char, d.x, d.y);
+  }
+  
+  pop();
+}
+
+// Background binary rain effect (slow matrix-style falling)
+function drawBinaryRain() {
+  if (!showDataStreams) return;
+  
+  push();
+  fill(94, 224, 193, 30);
+  textSize(12);
+  textAlign(CENTER, TOP);
+  
+  // Draw slow-moving background digits across the top portion
+  const rows = floor(height / 30);
+  const cols = floor(width / 20);
+  
+  for (let r = 0; r < rows * 0.3; r++) {
+    for (let c = 0; c < cols; c++) {
+      const xOffset = (frameCount * 0.3 + c * 17) % width;
+      const yOffset = (frameCount * 0.1 + r * 30) % height;
+      const char = random() > 0.5 ? "1" : "0";
+      text(char, xOffset, yOffset);
+    }
+  }
+  
+  pop();
+}
+
+// ---------------------------------------------------------------
+// SKELETON + LABELS (reference overlay only)
+// ---------------------------------------------------------------
+function drawSkeletonAndLabels(pose) {
+  const byName = {};
+  for (const k of pose.keypoints) byName[k.name] = k;
+
+  if (showSkeleton) {
+    stroke(255, 80, 80, 160);
+    strokeWeight(2);
+    for (const [a, b] of SKELETON_EDGES) {
+      const ka = byName[a], kb = byName[b];
+      if (ka && kb && ka.confidence >= minConfidence && kb.confidence >= minConfidence) {
+        line(ka.x, ka.y, kb.x, kb.y);
+      }
+    }
+  }
+
+  for (const k of pose.keypoints) {
+    if (k.confidence < minConfidence) continue;
+    const x = k.x, y = k.y;
+
+    if (showPoints) {
+      noStroke();
+      fill(94, 224, 193, 230);
+      circle(x, y, 7);
+      stroke(94, 224, 193, 90);
+      strokeWeight(1);
+      noFill();
+      circle(x, y, 14);
+    }
+
+    if (showSkeleton) {
+      noStroke();
+      fill(255, 255);
+      textSize(9.5);
+      textAlign(x > width - 90 ? RIGHT : LEFT, CENTER);
+      text(k.name, x + (x > width - 90 ? -10 : 10), y);
+    }
+  }
+}
+
+// ---------------------------------------------------------------
+// UI WIRING
+// ---------------------------------------------------------------
+function buildKeypointList() {
+  const el = document.getElementById("kpList");
+  el.innerHTML = KEYPOINT_NAMES.map((n, i) =>
+    `<div><span class="idx">${i}</span>${n}</div>`
+  ).join("");
+}
+
+function setStatus(live, text) {
+  const el = document.getElementById("status");
+  const t = document.getElementById("status-text");
+  el.classList.toggle("live", live);
+  t.textContent = text;
+}
+
+function wireUI() {
+  const bind = (id, handler) => document.getElementById(id).addEventListener("input", handler);
+
+  document.getElementById("toggleVideo").addEventListener("change", e => showVideo = e.target.checked);
+  document.getElementById("toggleSkeleton").addEventListener("change", e => showSkeleton = e.target.checked);
+  document.getElementById("togglePoints").addEventListener("change", e => showPoints = e.target.checked);
+  document.getElementById("toggleFaceBox").addEventListener("change", e => showFaceBox = e.target.checked);
+  document.getElementById("toggleDataStreams").addEventListener("change", e => showDataStreams = e.target.checked);
+
+  bind("confSlider", e => {
+    minConfidence = parseFloat(e.target.value);
+    document.getElementById("confVal").textContent = minConfidence.toFixed(2);
+  });
+  bind("spawnSlider", e => {
+    spawnRate = parseFloat(e.target.value);
+    document.getElementById("spawnVal").textContent = spawnRate.toFixed(2);
+  });
+  bind("intensitySlider", e => {
+    distortIntensity = parseFloat(e.target.value);
+    document.getElementById("intensityVal").textContent = distortIntensity.toFixed(2);
+  });
+  bind("maxSlider", e => {
+    maxShapes = parseInt(e.target.value);
+    document.getElementById("maxVal").textContent = maxShapes;
+  });
+  bind("vertSlider", e => {
+    vertsPerShape = parseInt(e.target.value);
+    document.getElementById("vertVal").textContent = vertsPerShape;
+  });
+  bind("faceBoxSlider", e => {
+    faceBoxSize = parseInt(e.target.value);
+    document.getElementById("faceBoxVal").textContent = faceBoxSize;
+  });
+  bind("dataRateSlider", e => {
+    dataStreamRate = parseFloat(e.target.value);
+    document.getElementById("dataRateVal").textContent = dataStreamRate.toFixed(2);
+  });
+  bind("dataSpeedSlider", e => {
+    dataStreamSpeed = parseFloat(e.target.value);
+    document.getElementById("dataSpeedVal").textContent = dataStreamSpeed.toFixed(2);
+  });
+
+  document.getElementById("clearBtn").addEventListener("click", () => {
+    shapes = [];
+    background(0);
+  });
+  document.getElementById("pauseBtn").addEventListener("click", (e) => {
+    spawnPaused = !spawnPaused;
+    e.target.textContent = spawnPaused ? "resume tracking" : "pause tracking";
+  });
+}
+</script>
+</body>
+</html>
